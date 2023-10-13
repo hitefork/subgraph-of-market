@@ -23,6 +23,9 @@ dataSources:
         - PunkBought
         - PunkNoLongerForSale
         - Transfer
+        - User
+        - MetaData
+        - Trait
       abis:
         - name: CryptoPunksMarket
           file: CryptoPunksMarket\abis\CryptoPunksMarket.json

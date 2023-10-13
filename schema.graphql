@@ -75,17 +75,46 @@ type PunkNoLongerForSale @entity(immutable: true) {
   blockTimestamp: BigInt!
   transactionHash: Bytes!
 }
-type BuyerInfo @entity(immutable: true){
-  id: Bytes!
+type User @entity(immutable: true){
+  id: Bytes! #用户ID
   punkIndex: BigInt! # uint256
-  value: BigInt! # uint256
-  address: Bytes!
-  totalValueBought: BigInt! # uint256
-  numPunksBought : Int!
+  count:BigInt! #交易次数
+  totalpunks: BigInt! #持有的punk总量
+  numPunksBought: BigInt! #出售的punk总数
+  numPunkssold: BigInt! #购买的punk总数
 }
-type SaleStats @entity(immutable: true){
-  id: Bytes!
-  totalValueSold: BigInt!
-  numPunksSold: BigInt! # uint256
-  mostRecentBuyer: Bytes! # uint256
+enum TraitType {
+  TYPE
+  ACCESSORY
+}
+type Trait @entity(immutable: true) {
+  "Trait"
+  id: ID!
+  type: TraitType!
+  metaDatas: [MetaData!]! @derivedFrom(field: "traits")
+
+  "Number of Punks with this trait"
+  numberOfNfts: BigInt!
+}
+type MetaData @entity(immutable: true) {
+  id: ID!
+
+  tokenId: BigInt!
+
+  "URI of Punk"
+  tokenURI: String!
+
+  "Punk image"
+  image: String
+
+  "Punk Svg image"
+  svg: String
+
+  "Contract URI"
+  contractURI: String!
+
+
+
+  "Punk Traits"
+  traits: [Trait!]!
 }

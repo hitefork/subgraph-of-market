@@ -25,6 +25,10 @@ dataSources:
         - PunkBought
         - PunkNoLongerForSale
         - Transfer
+        - User
+        - MetaData
+        - Trait
+       
         
 
       abis:

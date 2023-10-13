@@ -7,6 +7,7 @@ import {
   PunkBidWithdrawn as PunkBidWithdrawnEvent,
   PunkBought as PunkBoughtEvent,
   PunkNoLongerForSale as PunkNoLongerForSaleEvent
+  
 } from "../generated/CryptoPunksMarket/CryptoPunksMarket"
 import {
   Assign,
@@ -17,12 +18,20 @@ import {
   PunkBidWithdrawn,
   PunkBought,
   PunkNoLongerForSale,
-  BuyerInfo,
-  SaleStats
+  User,
+  MetaData,
+  Trait
+ 
  
 } from "../generated/schema"
 
 
+
+
+import { getTrait } from './traits'
+export const TOKEN_URI = 'https://cryptopunks.app/cryptopunks/details/'
+export const CONTRACT_URI = 'https://cryptopunks.app/cryptopunks'
+import { BigInt, Bytes } from "@graphprotocol/graph-ts";
 //基于原函数进行更改
 export function handleTransfer(event: TransferEvent): void {
   let contract=Transfer.load(event.transaction.hash.concatI32(event.logIndex.toI32()))
@@ -40,6 +49,42 @@ export function handleTransfer(event: TransferEvent): void {
   }
   contract.to = event.params.to
   contract.save()//存储
+
+  let owner=User.load(event.params.from)
+  let buyer=User.load(event.params.to)
+
+ //初始化
+  if (!owner) {
+    owner = new User(event.params.from)
+
+    owner.count = BigInt.fromI32(0)
+    owner.totalpunks = BigInt.fromI32(0)
+    owner.numPunksBought = BigInt.fromI32(0)
+    owner.numPunkssold = BigInt.fromI32(0)
+    owner.save()
+
+}
+  if (!buyer) {
+  buyer = new User(event.params.to)
+  buyer.count = BigInt.fromI32(0)
+  buyer.totalpunks = BigInt.fromI32(0)
+  buyer.numPunksBought = BigInt.fromI32(0)
+  buyer.numPunkssold = BigInt.fromI32(0)
+  buyer.save()
+}
+
+
+
+  owner.totalpunks=owner.totalpunks.minus(BigInt.fromI32(1))
+
+  buyer.totalpunks=buyer.totalpunks.plus(BigInt.fromI32(1))
+ 
+
+  owner.save()
+  buyer.save()
+  
+
+  
   }
   
 
@@ -57,29 +102,111 @@ export function handleTransfer(event: TransferEvent): void {
     Bought.transactionHash = event.transaction.hash
   
     Bought.save()
-     // 获取购买者信息
-     let buyerInfo = new BuyerInfo(event.params.toAddress) // 使用购买者地址作为ID
-     buyerInfo.punkIndex = event.params.punkIndex
-     buyerInfo.value = event.params.value
    
-     buyerInfo.save()
-  //获取购买者状态
-     let buyerStats = BuyerInfo.load(event.params.toAddress);
-     
-     if (!buyerStats) {
-       buyerStats = new BuyerInfo(event.params.toAddress);
-       buyerStats.address = event.params.toAddress;
-       buyerStats.totalValueBought =  event.params.value;
-       buyerStats.numPunksBought = 1;
-     } else {
-       buyerStats.totalValueBought = buyerStats.totalValueBought.plus(event.params.value);
-       buyerStats.numPunksBought += 1;
-     }
-   
-     buyerStats.save();
-    
+
+/*type User @entity(immutable: true){
+  id: Bytes! #用户ID
+  punkIndex: BigInt! # uint256
+  count:BigInt! #交易次数
+  totalpunks: BigInt! #持有的punk总量
+  numPunksBought: BigInt! #出售的punk总数
+  numPunkssold: BigInt! #购买的punk总数
+}
+*/
+
+
+  let owner=User.load(event.params.fromAddress)
+  let buyer=User.load(event.params.toAddress)
+
+ //初始化
+  if (!owner) {
+    owner = new User(event.params.fromAddress)
+    owner.punkIndex = event.params.punkIndex
+
+    owner.count = BigInt.fromI32(0)
+    owner.totalpunks = BigInt.fromI32(0)
+    owner.numPunksBought = BigInt.fromI32(0)
+    owner.numPunkssold = BigInt.fromI32(0)
+    owner.save()
+
+}
+  if (!buyer) {
+  buyer = new User(event.params.fromAddress)
+  buyer.punkIndex = event.params.punkIndex
+  buyer.count = BigInt.fromI32(0)
+
+  buyer.totalpunks = BigInt.fromI32(0)
+  buyer.numPunksBought = BigInt.fromI32(0)
+  buyer.numPunkssold = BigInt.fromI32(0)
+  buyer.save()
+}
+
+
+  owner.count = owner.count.plus(BigInt.fromI32(1))
+  owner.numPunkssold = owner.numPunkssold.plus(BigInt.fromI32(1))
+
+
+
+  buyer.count = buyer.count.plus(BigInt.fromI32(1))
+  buyer.numPunksBought = buyer.numPunksBought.plus(BigInt.fromI32(1))
+
+
+  owner.save()
+  buyer.save()
+  
+  
   }
+  export function createMetadata(punkId: BigInt): MetaData {
+    let metadata = new MetaData(punkId.toString())
+    metadata.tokenURI = TOKEN_URI.concat(punkId.toString())
+    metadata.contractURI = CONTRACT_URI
+  
+ 
+    metadata.contractURI = CONTRACT_URI
+  
+    metadata.traits = new Array<string>()
+  
+    metadata.save()
+  
+    return metadata as MetaData
+  }
+ 
 export function handleAssign(event: AssignEvent): void {
+
+  let trait = getTrait(event.params.punkIndex.toI32())
+  let tokenId = event.params.punkIndex
+  let metadata = createMetadata(tokenId)
+  if (trait !== null) {
+		let traits = new Array<string>()
+		let type = Trait.load(trait.type)
+		if (!type) {
+			type = new Trait(trait.type)
+			type.type = 'TYPE'
+			type.numberOfNfts = BigInt.fromI32(0)
+		}
+
+		type.numberOfNfts = type.numberOfNfts.plus(BigInt.fromI32(1))
+		type.save()
+		traits.push(type.id)
+
+		for (let i = 0; i < trait.accessories.length; i++) {
+			let accessoryName = trait.accessories[i]
+			let acessoryId = accessoryName.split(' ').join('-')
+			let accessory = Trait.load(acessoryId)
+
+			if (accessory === null) {
+				accessory = new Trait(acessoryId)
+				accessory.type = 'ACCESSORY'
+				accessory.numberOfNfts = BigInt.fromI32(0)
+			}
+			accessory.numberOfNfts = accessory.numberOfNfts.plus(BigInt.fromI32(1))
+			accessory.save()
+			traits.push(accessory.id)
+		}
+
+		metadata.traits = traits
+	}
+
 let assignment=Assign.load(event.transaction.hash.concatI32(event.logIndex.toI32()))
 if(!assignment){  
   assignment = new Assign(
@@ -93,6 +220,23 @@ if(!assignment){
   assignment.transactionHash = event.transaction.hash
 }// Set initial value to 0
 assignment.save()
+
+let buyer=User.load(event.params.to)
+if (!buyer) {
+  buyer = new User(event.params.to)
+  buyer.punkIndex = event.params.punkIndex
+  buyer.count = BigInt.fromI32(0)
+  buyer.totalpunks = BigInt.fromI32(0)
+  buyer.numPunksBought = BigInt.fromI32(0)
+  buyer.numPunkssold = BigInt.fromI32(0)
+  buyer.save()
+}
+
+buyer.totalpunks = buyer.totalpunks.plus(BigInt.fromI32(1))
+buyer.save()
+metadata.save()
+
+
 }
 
 
@@ -111,6 +255,9 @@ export function handlePunkTransfer(event: PunkTransferEvent): void {
   handling.transactionHash = event.transaction.hash
   }
   handling.save()
+
+
+
 }
 // Update the value of the buyer when transfer occurs
 export function handlePunkOffered(event: PunkOfferedEvent): void {
